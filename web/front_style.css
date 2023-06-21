@@ -1,0 +1,15 @@
+.center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 50%;
+}
+
+.size_img_search {
+    width: 150px;
+    height: 200px;
+}
+
+.size_date {
+    width: 250px;
+}

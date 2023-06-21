@@ -1,0 +1,18 @@
+version: "1"
+services:
+    # db:
+    #     container_name: mydb
+    #     image: mysql:8.0
+    #     extra_hosts:
+    #         - "host.docker.internal:host-gateway"
+    #     ports:
+    #         - "32001:3306"
+    #     environment:
+    #         MYSQL_ROOT_PASSWORD: test1234
+    app:
+        container_name: myapp
+        # links:
+        #     - "db"
+        build: ./
+        ports:
+            - "5001:5000"

@@ -7,6 +7,7 @@ import numpy as np
 import base64
 from PIL import Image
 import json
+import os
 
 from fastapi import FastAPI, File, UploadFile, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +25,7 @@ class Req_search(BaseModel):
 
 class Res_search_value(BaseModel):
     id: int
+    similarity: float
 
 class Res_search_main(BaseModel):
     value: list[Res_search_value]
@@ -58,7 +60,7 @@ async def hello():
 #     return {"file_size": len(file)}
 
 
-@app.post("/uploadfile")
+@app.post("/verify")
 async def create_upload_file(data: Req_search) -> Res_search_main:
     # print(file.filename)
     # contents = await file.read()
@@ -68,8 +70,11 @@ async def create_upload_file(data: Req_search) -> Res_search_main:
     # print(str(end_datetime))
     # data = req.json() # change input(request model) to Json
     # data = json.loads(data) # change Json to Dict
-    result = search(start_dt = str(data.start_datetime),end_dt=str(data.end_datetime),search_pic=data.file_path)
-    return result
+    if(os.path.exists(data.file_path)):
+        result = search(start_dt = str(data.start_datetime),end_dt=str(data.end_datetime),search_pic=data.file_path)
+        return result
+    else:
+        return {'message': 'Confirm that '+ data.file_path +' exists'}
     # return StreamingResponse(io.BytesIO(im_png.tobytes()), media_type="image/png")
 
 # @app.post("/uploadfiles")

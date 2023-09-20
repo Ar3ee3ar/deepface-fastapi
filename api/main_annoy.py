@@ -97,7 +97,7 @@ jobs: Dict[UUID, Job] = {}  # Dict as job storage
 # all_result = {"value":[]}
 
 
-def long_task(all_result: List,task_id: UUID, db_list:List, search_pic:str):
+def long_task(all_result: List, db_list:List, search_pic:str):
     # all_result = {"value":[]}
     all_time_verify = 0
     found_pic = []
@@ -117,14 +117,15 @@ def long_task(all_result: List,task_id: UUID, db_list:List, search_pic:str):
                             "id":db_list[i][0],
                             "similarity": (1-result['distance'])
                         }
-                        all_result.append(json_pic)
+                        all_result["value"].append(json_pic)
             except cv2.error as e:
                 # print("OpenCV Error:", e)
                 print("Custom error message: Unable to decode image.")
                 pass
-            jobs[task_id].progress = i+1
-        jobs[task_id].result = all_result
-    jobs[task_id].status = "completed"
+    return all_result
+    #         jobs[task_id].progress = i+1
+    #     jobs[task_id].result = all_result
+    # jobs[task_id].status = "completed"
     # for i in range(1, param):  # do work and return our progress
     #     await asyncio.sleep(1)
     #     await queue.put(i)
@@ -145,20 +146,16 @@ def long_task(all_result: List,task_id: UUID, db_list:List, search_pic:str):
     # jobs[uid].status = "complete"
 
 
-@app.post("/search_deep", status_code=HTTPStatus.ACCEPTED)
-async def task_handler(background_tasks: BackgroundTasks, data: Req_search) -> Job:
-    new_task = Job()
-    jobs[new_task.uid] = new_task
-    dir_list = filter(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
-    jobs[new_task.uid].all_img = len(dir_list)
-    jobs[new_task.uid].status = "in_progress"
-    all_result = []
-    background_tasks.add_task(long_task,all_result, new_task.uid,db_list = dir_list,search_pic=data.file_path)
-    return new_task
-    # new_task = Job()
-    # jobs[new_task.uid] = new_task
-    # background_tasks.add_task(start_new_task, new_task.uid, data)
-    # return new_task
+# @app.post("/search_deep", status_code=HTTPStatus.ACCEPTED)
+# async def task_handler(background_tasks: BackgroundTasks, data: Req_search) -> Job:
+#     new_task = Job()
+#     jobs[new_task.uid] = new_task
+#     dir_list = filter(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
+#     jobs[new_task.uid].all_img = len(dir_list)
+#     jobs[new_task.uid].status = "in_progress"
+#     all_result = []
+#     background_tasks.add_task(long_task,all_result, new_task.uid,db_list = dir_list,search_pic=data.file_path)
+#     return new_task
 
 
 @app.get("/task/{uid}/status")
@@ -173,20 +170,20 @@ def recreate_annoy():
     else:
         return {"message": "Error"}
 
-@app.post("/search_tree", status_code=HTTPStatus.ACCEPTED)
-async def task_handler_tree(background_tasks: BackgroundTasks, data: Req_search) -> Job:
-    new_task = Job()
-    jobs[new_task.uid] = new_task
-    dir_list = filter_id(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
-    jobs[new_task.uid].all_img = len(dir_list)
-    jobs[new_task.uid].status = "in_progress"
-    all_result = []
-    background_tasks.add_task(search_tree,all_result, new_task.uid,db_list = dir_list,search_pic=data.file_path)
-    return new_task
+# @app.post("/search_tree", status_code=HTTPStatus.ACCEPTED)
+# async def task_handler_tree(background_tasks: BackgroundTasks, data: Req_search) -> Job:
+#     new_task = Job()
+#     jobs[new_task.uid] = new_task
+#     dir_list = filter_id(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
+#     jobs[new_task.uid].all_img = len(dir_list)
+#     jobs[new_task.uid].status = "in_progress"
+#     all_result = []
+#     background_tasks.add_task(search_tree,all_result, new_task.uid,db_list = dir_list,search_pic=data.file_path)
+#     return new_task
 
 
 
-def search_tree(all_result: List,task_id: UUID, db_list:List, search_pic:str):
+def search_tree(all_result: List, db_list:List, search_pic:str):
     # all_result = []
     # dir_list = filter_id(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
     embedding_objs = DeepFace.represent(img_path = search_pic, model_name= "Facenet512",enforce_detection=False, detector_backend ='opencv')
@@ -199,23 +196,22 @@ def search_tree(all_result: List,task_id: UUID, db_list:List, search_pic:str):
 
     i = 0
     for id,sim in zip(rank_id,rank_sim):
-        if(id in db_list_id):
-            if(1-((sim**2)/2) > 0.65):
-                # print('id: ',id,' => sim: ',1-((sim**2)/2))
-                json_pic = {
-                                "id":id,
-                                "similarity": 1-((sim**2)/2)
-                            }
-                all_result.append(json_pic)
-            i = i +1
-            jobs[task_id].progress = i
-        jobs[task_id].result = all_result
-    # jobs[task_id].progress = len(db_list_id)
-    jobs[task_id].status = "completed"
-    # return all_result
+        if(id in db_list_id and 1-((sim**2)/2) > 0.65):
+            # print('id: ',id,' => sim: ',1-((sim**2)/2))
+            json_pic = {
+                            "id":id,
+                            "similarity": 1-((sim**2)/2)
+                        }
+            all_result["value"].append(json_pic)
+        i = i +1
+    #     jobs[task_id].progress = i
+    #     jobs[task_id].result = all_result
+    # # jobs[task_id].progress = len(db_list_id)
+    # jobs[task_id].status = "completed"
+    return all_result
 
-@app.post("/verify", status_code=HTTPStatus.ACCEPTED)
-async def task_handler_combine(background_tasks: BackgroundTasks, data: Req_search) -> Job:
+@app.post("/verify")
+def task_handler_combine(data: Req_search) -> Res_search_main:
     flag_new = False
     f = open("update_date.txt", "r")
     date_db = f.readline()
@@ -225,29 +221,28 @@ async def task_handler_combine(background_tasks: BackgroundTasks, data: Req_sear
     time_start_dt = datetime.strptime(str(data.start_datetime),'%Y-%m-%d %H:%M:%S')
     time_end_dt = datetime.strptime(str(data.end_datetime),'%Y-%m-%d %H:%M:%S')
 
-    new_task = Job()
-    jobs[new_task.uid] = new_task
-    jobs[new_task.uid].status = "in_progress"
-    all_result = []
+    # new_task = Job()
+    # jobs[new_task.uid] = new_task
+    # jobs[new_task.uid].status = "in_progress"
+    all_result = {"value":[]}
     # search data newer than in (annoy) index data -> deepface
     if(time_start_dt > time_db_dt):
         print('deepface')
         dir_list = filter(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
-        jobs[new_task.uid].all_img = len(dir_list)
-        background_tasks.add_task(long_task,all_result, new_task.uid,db_list = dir_list,search_pic=data.file_path)
+        # jobs[new_task.uid].all_img = len(dir_list)
+        long_task(all_result,db_list = dir_list,search_pic=data.file_path)
     # search data in (annoy) index data with some newer data -> deepface + annoyindex
     elif(time_start_dt < time_db_dt and time_end_dt > time_db_dt):
         print('deepface + annoyindex')
         dir_list = filter(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
         db_above = filter(start_dt=str(time_db_dt + timedelta(seconds=1)),end_dt=str(data.end_datetime))
-        jobs[new_task.uid].all_img = len(dir_list)
+        # jobs[new_task.uid].all_img = len(dir_list)
         if(len(db_above) > 0):
             # print(db_above)
             # print('have more data')
             flag_new = True
-        background_tasks.add_task(combine_process,
+        result = combine_process(
                                   all_result,
-                                  new_task.uid,
                                   db_list = dir_list,
                                   search_pic=data.file_path,
                                   flag_new = flag_new,
@@ -256,12 +251,12 @@ async def task_handler_combine(background_tasks: BackgroundTasks, data: Req_sear
     elif(time_start_dt <= time_db_dt and time_end_dt <= time_db_dt):
         print('annoyindex')
         dir_list = filter(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
-        jobs[new_task.uid].all_img = len(dir_list)
-        background_tasks.add_task(search_tree,all_result, new_task.uid,db_list = dir_list,search_pic=data.file_path)
-    return new_task
+        # jobs[new_task.uid].all_img = len(dir_list)
+        result = search_tree(all_result, db_list = dir_list,search_pic=data.file_path)
+    return result
 
 
-def combine_process(all_result: List,task_id: UUID, db_list:List, search_pic:str, flag_new: bool, db_new:List):
+def combine_process(all_result: List, db_list:List, search_pic:str, flag_new: bool, db_new:List):
     # all_result = []
     # dir_list = filter_id(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
     embedding_objs = DeepFace.represent(img_path = search_pic, model_name= "Facenet512",enforce_detection=False)
@@ -272,17 +267,17 @@ def combine_process(all_result: List,task_id: UUID, db_list:List, search_pic:str
 
     count = 0
     for id,sim in zip(rank_id,rank_sim):
-        if(id in db_list_id):
-            if((1-((sim**2)/2)) > 0.65):
-                # print('id: ',id,' => sim: ',1-((sim**2)/2))
-                json_pic = {
-                                "id":id,
-                                "similarity": (1-((sim**2)/2))
-                            }
-                all_result.append(json_pic)
-            count = count +1
-            jobs[task_id].progress = count
-        jobs[task_id].result = all_result
+        print(count)
+        if(id in db_list_id and (1-((sim**2)/2)) > 0.65):
+            # print('id: ',id,' => sim: ',1-((sim**2)/2))
+            json_pic = {
+                            "id":id,
+                            "similarity": (1-((sim**2)/2))
+                        }
+            all_result["value"].append(json_pic)
+        # count = count +1
+        # jobs[task_id].progress = count
+        # jobs[task_id].result = all_result
     # count = len(db_list_id)
     # jobs[task_id].progress = len(db_list_id)
     
@@ -299,11 +294,9 @@ def combine_process(all_result: List,task_id: UUID, db_list:List, search_pic:str
                                 "id":db_new[i][0],
                                 "similarity": (1-result['distance'])
                             }
-                            all_result.append(json_pic)
+                            all_result["value"].append(json_pic)
                 except cv2.error as e:
                     # print("OpenCV Error:", e)
                     print("Custom error message: Unable to decode image.")
                     pass
-                jobs[task_id].progress = count + i
-            jobs[task_id].result = all_result
-    jobs[task_id].status = "completed"
+    return all_result

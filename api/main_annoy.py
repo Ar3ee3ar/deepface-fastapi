@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 # from .face_aging_standalone import main_mani
 # import face_aging_standalone
-from .process.verify_progress import filter, get_all, filter_id, filter_greater_than
+from .process.verify_progress import filter, get_all, filter_id, filter_greater_than,test_filter_deepface
 # from .process.annoy_process import u
 
 u = AnnoyIndex(512, 'angular')
@@ -108,6 +108,7 @@ def long_task(all_result: List, db_list:List, search_pic:str):
         if(os.path.exists(name_path) and name_path.find('.jpg') != -1):
             try:
                 result = DeepFace.verify(img1_path = search_pic, img2_path = name_path ,enforce_detection= False, model_name= "Facenet512", detector_backend ='opencv')
+                # print(str(result['verified']),' => ',str(result['distance']))
                 if(result['verified'] and result['distance'] < 0.35):
                         # all_result.append(dir_list[i][1])
                         # all_time_verify = all_time_verify + int(result["time"])
@@ -230,7 +231,7 @@ def task_handler_combine(data: Req_search) -> Res_search_main:
         print('deepface')
         dir_list = filter(start_dt=str(data.start_datetime),end_dt=str(data.end_datetime))
         # jobs[new_task.uid].all_img = len(dir_list)
-        long_task(all_result,db_list = dir_list,search_pic=data.file_path)
+        result = long_task(all_result,db_list = dir_list,search_pic=data.file_path)
     # search data in (annoy) index data with some newer data -> deepface + annoyindex
     elif(time_start_dt < time_db_dt and time_end_dt > time_db_dt):
         print('deepface + annoyindex')
@@ -267,7 +268,7 @@ def combine_process(all_result: List, db_list:List, search_pic:str, flag_new: bo
 
     count = 0
     for id,sim in zip(rank_id,rank_sim):
-        print(count)
+        # print(count)
         if(id in db_list_id and (1-((sim**2)/2)) > 0.65):
             # print('id: ',id,' => sim: ',1-((sim**2)/2))
             json_pic = {
@@ -283,18 +284,20 @@ def combine_process(all_result: List, db_list:List, search_pic:str, flag_new: bo
     
     if(flag_new):
         for i in range(len(db_new)):
-            name_pic_file = db_list[i][1].split('/')
-            # file_type = name_pic_file[-1].split('.')
+            name_pic_file = db_new[i][1].split('/')
+            # print('/var/www/html/pic/'+name_pic_file[-1])
             name_path = '/var/www/html/pic/'+name_pic_file[-1]
             if(os.path.exists(name_path) and name_path.find('.jpg') != -1):
                 try:
                     result = DeepFace.verify(img1_path = search_pic, img2_path = name_path ,enforce_detection= False, model_name= "Facenet512", detector_backend ='opencv')
+                    # print(str(result['verified']),' => ',str(result['distance']))
                     if(result['verified'] and result['distance'] < 0.35):
                             json_pic = {
                                 "id":db_new[i][0],
                                 "similarity": (1-result['distance'])
                             }
                             all_result["value"].append(json_pic)
+                            # print(json_pic)
                 except cv2.error as e:
                     # print("OpenCV Error:", e)
                     print("Custom error message: Unable to decode image.")
